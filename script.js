@@ -12,46 +12,66 @@ function getDeviceInfo() {
     };
 }
 
-console.log("Script started");
-
-// Step 1: Fetch IP and location
-fetch("https://ipapi.co/json/")
-    .then(res => {
-        console.log("Fetched IP API response:", res);
-        if (!res.ok) throw new Error(`IP API request failed with status ${res.status}`);
-        return res.json();
+// Function to log to Google Sheets
+function logToSheet(payload) {
+    fetch(APPS_SCRIPT_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
     })
-    .then(data => {
-        console.log("IP API JSON data:", data);
-
-        // Show location on the page
-        locationEl.textContent = `You are in ${data.city}, ${data.region}, ${data.country_name}`;
-
-        const payload = {
-            ip: data.ip,
-            city: data.city,
-            region: data.region,
-            country: data.country_name,
-            userAgent: navigator.userAgent,
-            referrer: document.referrer,
-            device: getDeviceInfo()
-        };
-
-        console.log("Payload for Google Sheets:", payload);
-
-        // Step 2: Send data to Google Sheets
-        return fetch(APPS_SCRIPT_URL, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(payload)
-        });
+    .then(res => res.json())
+    .then(resData => {
+        console.log("Logged to Google Sheet:", resData);
+        locationEl.textContent += " ✅ Your visit has been logged!";
     })
-    .then(res => {
-        console.log("Google Apps Script response status:", res.status, res.statusText);
-        return res.json();
-    })
-    .then(resData => console.log("Google Apps Script response data:", resData))
     .catch(err => {
-        console.error("Error caught:", err);
-        locationEl.textContent = "Could not fetch your location or log it.";
+        console.warn("Could not log visit:", err);
+        locationEl.textContent += " ⚠️ Failed to log visit.";
     });
+}
+
+// Function to fetch location from an IP API
+function fetchLocation(apiUrl) {
+    console.log(`Fetching location from: ${apiUrl}`);
+    fetch(apiUrl)
+        .then(res => {
+            if (!res.ok) throw new Error(`IP API request failed: ${res.status}`);
+            return res.json();
+        })
+        .then(data => {
+            console.log("IP API data:", data);
+
+            const city = data.city || data.city_name || "Unknown City";
+            const region = data.region || data.region_name || "Unknown Region";
+            const country = data.country_name || data.country || "Unknown Country";
+
+            // Show location in HTML
+            locationEl.textContent = `You are in ${city}, ${region}, ${country}`;
+
+            // Prepare payload
+            const payload = {
+                ip: data.ip || '',
+                city,
+                region,
+                country,
+                userAgent: navigator.userAgent,
+                referrer: document.referrer,
+                device: getDeviceInfo()
+            };
+
+            // Log to Google Sheet
+            logToSheet(payload);
+        })
+        .catch(err => {
+            console.error("IP API error:", err);
+            if (apiUrl.includes("ipapi.co")) {
+                // Fallback to another API
+                fetchLocation("https://ipwho.is/");
+            } else {
+                locationEl.textContent = "Could not fetch your location.";
+            }
+        });
+}
+
+// Start fetching location from primary API
+fetchLocation("https://ipapi.co/json/");
