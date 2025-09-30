@@ -1,14 +1,75 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <title>Hey, You Are Here!</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta charset="UTF-8">
+  <title>Hello, You Are Here!</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
 </head>
 <body>
-    <h1>Hey, You Are Here!</h1>
-    <p id="location">Loading your location...</p>
+  <h1>Hello, You Are Here!</h1>
+  <p id="location">Loading your location...</p>
 
-    <script src="script.js"></script>
+  <script>
+    const locationEl = document.getElementById("location");
+
+    function getDeviceInfo() {
+      return {
+        width: window.screen.width,
+        height: window.screen.height,
+        language: navigator.language,
+        platform: navigator.platform,
+        vendor: navigator.vendor
+      };
+    }
+
+    function logToSheet(payload) {
+      google.script.run.withSuccessHandler(res => {
+        locationEl.textContent += " ✅ Your visit has been logged!";
+        console.log(res);
+      })
+      .withFailureHandler(err => {
+        locationEl.textContent += " ⚠️ Failed to log visit.";
+        console.warn(err);
+      })
+      .logVisit(payload); // see function below
+    }
+
+    function fetchLocation() {
+      fetch("https://ipapi.co/json/")
+        .then(res => res.json())
+        .then(data => {
+          const city = data.city || "Unknown City";
+          const region = data.region || "Unknown Region";
+          const country = data.country_name || "Unknown Country";
+
+          locationEl.textContent = `You are in ${city}, ${region}, ${country}`;
+
+          const payload = {
+            ip: data.ip || '',
+            city,
+            region,
+            country,
+            userAgent: navigator.userAgent,
+            referrer: document.referrer,
+            device: getDeviceInfo()
+          };
+
+          // Send to Apps Script backend
+          google.script.run.withSuccessHandler(res => {
+            console.log("Logged:", res);
+          }).withFailureHandler(err => {
+            console.warn("Logging failed:", err);
+          }).logVisit(payload);
+
+        })
+        .catch(err => {
+          console.error("IP API error:", err);
+          locationEl.textContent = "Could not fetch your location.";
+        });
+    }
+
+    fetchLocation();
+  </script>
 </body>
 </html>
+
