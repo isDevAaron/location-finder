@@ -1,71 +1,77 @@
-const webAppUrl = "https://script.google.com/macros/s/AKfycbxOTtMlg6YU-60d-EwP-FY7YfRcQlNh39EXpUN68eltpTKd-Fs7Nt0UnWSx5IZczsa15g/exec";
+const locationEl = document.getElementById("location");
+const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzj7xZBc7u0R6hBBsIcwsNtjIheywVltzXhkHNgHxyodoROuSq6bej08OagvU0YX7728Q/exec";
 
+// Gather device info
 function getDeviceInfo() {
     return {
-        screen: { width: window.screen.width, height: window.screen.height },
+        width: window.screen.width,
+        height: window.screen.height,
         language: navigator.language,
         platform: navigator.platform,
         vendor: navigator.vendor
     };
 }
 
-async function sendVisit(data) {
-    try {
-        const res = await fetch(webAppUrl, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(data)
-        });
-        const result = await res.json();
-        if(result.status === 'Logged') {
-            console.log("Visit logged successfully.");
-        } else {
-            console.warn("Failed to log visit:", result.message);
-        }
-    } catch (err) {
-        console.error("Error sending visit:", err);
-    }
+// Log visit to Google Sheet
+function logToSheet(payload) {
+    fetch(APPS_SCRIPT_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+    })
+    .then(res => res.json())
+    .then(resData => {
+        console.log("Logged to Google Sheet:", resData);
+        locationEl.textContent += " ✅ Your visit has been logged!";
+    })
+    .catch(err => {
+        console.warn("Could not log visit:", err);
+        locationEl.textContent += " ⚠️ Failed to log visit.";
+    });
 }
 
-function showLocation(city, region, country) {
-    const locEl = document.getElementById("location");
-    locEl.textContent = `You are in ${city}, ${region}, ${country}`;
-}
+// Fetch location from IP API
+function fetchLocation(apiUrl) {
+    console.log(`Fetching location from: ${apiUrl}`);
+    fetch(apiUrl)
+        .then(res => {
+            if (!res.ok) throw new Error(`IP API request failed: ${res.status}`);
+            return res.json();
+        })
+        .then(data => {
+            console.log("IP API data:", data);
 
-async function init() {
-    if(navigator.geolocation) {
-        navigator.geolocation.getCurrentPosition(async (pos) => {
-            const { latitude, longitude } = pos.coords;
+            const city = data.city || data.city_name || "Unknown City";
+            const region = data.region || data.region_name || "Unknown Region";
+            const country = data.country_name || data.country || "Unknown Country";
 
-            // Reverse geocode
-            const geoRes = await fetch(`https://geocode.xyz/${latitude},${longitude}?geoit=json`);
-            const geoData = await geoRes.json();
+            // Show location in HTML
+            locationEl.textContent = `You are in ${city}, ${region}, ${country}`;
 
-            const city = geoData.city || "Unknown City";
-            const region = geoData.state || "Unknown Region";
-            const country = geoData.country || "Unknown Country";
-
-            showLocation(city, region, country);
-
-            const visitData = {
-                ip: "",
+            // Prepare payload
+            const payload = {
+                ip: data.ip || '',
                 city,
                 region,
                 country,
                 userAgent: navigator.userAgent,
-                referrer: document.referrer || "",
+                referrer: document.referrer,
                 device: getDeviceInfo()
             };
 
-            sendVisit(visitData);
-
-        }, (err) => {
-            console.warn("Geolocation failed:", err);
-            showLocation("Unknown City", "Unknown Region", "Unknown Country");
+            // Log to Google Sheet
+            logToSheet(payload);
+        })
+        .catch(err => {
+            console.error("IP API error:", err);
+            if (apiUrl.includes("ipapi.co")) {
+                // Fallback to another API
+                fetchLocation("https://ipwho.is/json/");
+            } else {
+                locationEl.textContent = "Could not fetch your location.";
+            }
         });
-    } else {
-        showLocation("Unknown City", "Unknown Region", "Unknown Country");
-    }
 }
 
-init();
+// Start fetching location
+fetchLocation("https://ipapi.co/json/");
