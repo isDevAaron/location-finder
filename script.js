@@ -1,5 +1,5 @@
 const locationEl = document.getElementById("location");
-const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzj7xZBc7u0R6hBBsIcwsNtjIheywVltzXhkHNgHxyodoROuSq6bej08OagvU0YX7728Q/exec";
+const APPS_SCRIPT_URL = "https://script.google.com/macros/library/d/1NNbrC-QTL3o9wGKDOUR3S4ghwFnzr_YtL_ANH_pJwZ9jalGvjAvl8sKY/2";
 
 // Function to gather device info
 function getDeviceInfo() {
